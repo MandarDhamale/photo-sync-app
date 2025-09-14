@@ -15,7 +15,6 @@ A personal photo syncing system that allows your Android device to upload photos
 
 - Works only if your laptop and phone are connected to the **same Wi-Fi network**.
 - Requests are **not yet secured** with JWT.
-- Still a **work in progress**.
 
 ## Getting Started
 
