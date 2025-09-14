@@ -31,4 +31,13 @@ A personal photo syncing system that allows your Android device to upload photos
    ```bash
    git clone https://github.com/MandarDhamale/photo-sync-app.git
 
+![app](https://github.com/user-attachments/assets/a1a15681-c74a-4631-a745-7f5d651bde5b)
+<img width="1920" height="1080" alt="server" src="https://github.com/user-attachments/assets/f0cdd2b7-b89a-406c-bcc4-d4f9aaa87baf" />
+<img width="1920" height="1080" alt="meta" src="https://github.com/user-attachments/assets/df07a1af-4336-462b-945e-9578fcd0c590" />
+
+
+
+   
+
+
    
