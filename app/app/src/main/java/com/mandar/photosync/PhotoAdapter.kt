@@ -13,7 +13,6 @@ class PhotoAdapter(private val photos: List<PhotoItem>) :
 
     class PhotoViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val photoImage: ImageView = itemView.findViewById(R.id.photoImage)
-        val photoName: TextView = itemView.findViewById(R.id.photoName)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PhotoViewHolder {
@@ -30,8 +29,6 @@ class PhotoAdapter(private val photos: List<PhotoItem>) :
             .placeholder(android.R.drawable.ic_menu_gallery)
             .error(android.R.drawable.ic_dialog_alert)
             .into(holder.photoImage)
-
-        holder.photoName.text = photo.name
     }
 
     override fun getItemCount(): Int = photos.size

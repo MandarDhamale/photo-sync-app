@@ -34,18 +34,40 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import org.json.JSONObject
+
 class MainActivity : AppCompatActivity() {
 
-    private val apiService = RetrofitInstance.api
-    private lateinit var syncNowButton: Button
-    private lateinit var refreshButton: Button
-    private lateinit var statusText: TextView
-    private lateinit var statusIcon: ImageView
+    private val apiService: PhotoSyncApiService get() = RetrofitInstance.getApi(applicationContext)
+    private lateinit var syncNowButton: com.google.android.material.floatingactionbutton.FloatingActionButton
+    private lateinit var addPhotosButton: ImageView
+    private lateinit var settingsButton: ImageView
     private lateinit var syncProgress: ProgressBar
-    private lateinit var lastSyncText: TextView
-    private lateinit var totalPhotosText: TextView // Changed from photosCountText
-    private lateinit var lastPhotoText: TextView
-    private lateinit var settingsButton: Button // Added this
+    private lateinit var toolbar: androidx.appcompat.widget.Toolbar
+    
+    private val barcodeLauncher = registerForActivityResult(ScanContract()) { result ->
+        if (result.contents == null) {
+            Toast.makeText(this, "Cancelled pairing", Toast.LENGTH_LONG).show()
+        } else {
+            try {
+                val json = JSONObject(result.contents)
+                val ip = json.getString("ip")
+                val port = json.getInt("port")
+                val token = json.getString("token")
+                val prefs = getSharedPreferences("photosync", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("server_ip", ip)
+                    .putInt("server_port", port)
+                    .putString("server_token", token)
+                    .apply()
+                Toast.makeText(this, "Paired successfully with $ip", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(this, "Invalid QR code", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     private lateinit var recyclerView: RecyclerView
 
     private lateinit var photoAdapter: PhotoAdapter
@@ -61,25 +83,35 @@ class MainActivity : AppCompatActivity() {
         loadGalleryPhotos()
         loadStatistics()
         requestPermissions()
+        checkPartialAccess()
     }
 
     private fun initializeViews() {
         syncNowButton = findViewById(R.id.syncNowButton)
-        refreshButton = findViewById(R.id.refreshButton)
-        statusText = findViewById(R.id.statusText)
-        statusIcon = findViewById(R.id.statusIcon)
         syncProgress = findViewById(R.id.syncProgress)
-        lastSyncText = findViewById(R.id.lastSyncText)
-        totalPhotosText = findViewById(R.id.photosCountText) // This matches XML
-        lastPhotoText = findViewById(R.id.lastPhotoText) // This matches XML
-        settingsButton = findViewById(R.id.settingsButton) // This matches XML
+        addPhotosButton = findViewById(R.id.addPhotosButton)
+        settingsButton = findViewById(R.id.settingsButton)
         recyclerView = findViewById(R.id.recyclerView)
+        toolbar = findViewById(R.id.toolbar)
+    }
+
+    private fun checkPartialAccess() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val hasImages = ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+            val hasPartial = ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
+            
+            if (!hasImages && hasPartial) {
+                addPhotosButton.visibility = View.VISIBLE
+            } else {
+                addPhotosButton.visibility = View.GONE
+            }
+        }
     }
 
     private fun setupRecyclerView() {
         photoAdapter = PhotoAdapter(photoList)
         recyclerView.apply {
-            layoutManager = GridLayoutManager(this@MainActivity, 3)
+            layoutManager = GridLayoutManager(this@MainActivity, 4) // Changed from 3 to 4
             adapter = photoAdapter
             setHasFixedSize(true)
         }
@@ -87,73 +119,59 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupClickListeners() {
         syncNowButton.setOnClickListener { startSync() }
-        refreshButton.setOnClickListener { loadGalleryPhotos() }
-        settingsButton.setOnClickListener { showSettings() } // Now using the correct variable
+        settingsButton.setOnClickListener { showSettings() }
+        addPhotosButton.setOnClickListener { requestPermissions() }
     }
 
     private fun loadStatistics() {
         val prefs = getSharedPreferences("photosync", Context.MODE_PRIVATE)
         val syncedCount = prefs.getInt("photos_synced", 0)
-        val lastPhoto = prefs.getString("last_photo", "--")
-
-        totalPhotosText.text = syncedCount.toString() // Fixed reference
-        lastPhotoText.text = lastPhoto // Fixed reference
-
-        val lastSyncTime = prefs.getLong("last_sync_time", 0)
-        if (lastSyncTime > 0) {
-            val dateFormat = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
-            val date = Date(lastSyncTime * 1000)
-            lastSyncText.text = "Last sync: ${dateFormat.format(date)}"
-        }
+        toolbar.subtitle = "$syncedCount photos synced"
     }
 
-    private fun updateStatistics() {
+    private fun updateStatistics(syncedThisSession: Int) {
         val prefs = getSharedPreferences("photosync", Context.MODE_PRIVATE)
-        val newCount = prefs.getInt("photos_synced", 0) + 1
-        val lastPhoto = "Photo_${System.currentTimeMillis()}.jpg"
-
+        val newCount = prefs.getInt("photos_synced", 0) + syncedThisSession
+        
         prefs.edit()
             .putInt("photos_synced", newCount)
-            .putString("last_photo", lastPhoto)
             .putLong("last_sync_time", System.currentTimeMillis() / 1000)
             .apply()
 
-        totalPhotosText.text = newCount.toString() // Fixed reference
-        lastPhotoText.text = lastPhoto // Fixed reference
-
-        val dateFormat = SimpleDateFormat("MMM dd, hh:mm a", Locale.getDefault())
-        lastSyncText.text = "Last sync: ${dateFormat.format(Date())}"
+        toolbar.subtitle = "$newCount photos synced"
     }
 
     private fun startSync() {
+        val prefs = getSharedPreferences("photosync", Context.MODE_PRIVATE)
+        if (!prefs.contains("server_ip")) {
+            Toast.makeText(this, "Please pair with server first (Settings)", Toast.LENGTH_LONG).show()
+            showSettings()
+            return
+        }
+
         if (!hasStoragePermission()) {
             Toast.makeText(this, "Please grant storage permissions first", Toast.LENGTH_SHORT).show()
             requestPermissions()
             return
         }
 
-        statusText.text = "Syncing photos..."
-        statusIcon.setImageResource(android.R.drawable.ic_popup_sync)
         syncProgress.visibility = View.VISIBLE
         syncNowButton.isEnabled = false
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 startPhotoSyncService()
-                manuallySyncPhotos()
+                val syncedCount = manuallySyncPhotos()
 
                 withContext(Dispatchers.Main) {
-                    statusText.text = "Sync complete"
-                    statusIcon.setImageResource(android.R.drawable.ic_menu_upload)
                     syncProgress.visibility = View.GONE
                     syncNowButton.isEnabled = true
-                    updateStatistics()
+                    updateStatistics(syncedCount)
+                    Toast.makeText(this@MainActivity, "Sync complete", Toast.LENGTH_SHORT).show()
                     loadGalleryPhotos()
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    statusText.text = "Sync failed"
-                    statusIcon.setImageResource(android.R.drawable.ic_dialog_alert)
                     syncProgress.visibility = View.GONE
                     syncNowButton.isEnabled = true
                     Toast.makeText(this@MainActivity, "Sync failed: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -175,7 +193,6 @@ class MainActivity : AppCompatActivity() {
                     photoList.clear()
                     photoList.addAll(photos)
                     photoAdapter.notifyDataSetChanged()
-                    totalPhotosText.text = "${photos.size} photos" // Fixed reference
                 }
             } catch (e: Exception) {
                 Log.e("MainActivity", "Error loading photos: ${e.message}")
@@ -222,7 +239,7 @@ class MainActivity : AppCompatActivity() {
         return photos
     }
 
-    private suspend fun manuallySyncPhotos() {
+    private suspend fun manuallySyncPhotos(): Int {
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
@@ -232,6 +249,7 @@ class MainActivity : AppCompatActivity() {
 
         val prefs = getSharedPreferences("photosync", Context.MODE_PRIVATE)
         val lastSyncTime = prefs.getLong("last_sync_time", 0)
+        var syncedThisSession = 0
 
         contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -252,7 +270,10 @@ class MainActivity : AppCompatActivity() {
                     val path = cursor.getString(dataIndex)
                     val dateAdded = cursor.getLong(dateIndex)
 
-                    uploadPhotoDirectly(path, name)
+                    val success = uploadPhotoDirectly(path, name)
+                    if (success) {
+                        syncedThisSession++
+                    }
 
                     if (dateAdded > latestTimestamp) {
                         latestTimestamp = dateAdded
@@ -262,18 +283,20 @@ class MainActivity : AppCompatActivity() {
 
             prefs.edit().putLong("last_sync_time", latestTimestamp).apply()
         }
+        return syncedThisSession
     }
 
-    private suspend fun uploadPhotoDirectly(filePath: String, fileName: String) {
+    private suspend fun uploadPhotoDirectly(filePath: String, fileName: String): Boolean {
         try {
             val file = java.io.File(filePath)
             if (file.exists()) {
                 val requestBody = file.asRequestBody("image/*".toMediaType())
                 val filePart = MultipartBody.Part.createFormData("file", fileName, requestBody)
 
-                val response = apiService.uploadPhoto("", filePart)
+                val response = apiService.uploadPhoto(filePart)
                 if (response.isSuccessful) {
                     Log.d("ManualSync", "Uploaded: $fileName")
+                    return true
                 } else {
                     Log.e("ManualSync", "Failed: $fileName - ${response.code()}")
                 }
@@ -281,22 +304,32 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e("ManualSync", "Error: ${e.message}")
         }
+        return false
     }
 
     private fun hasStoragePermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
+                   ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
         } else {
-            ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+            return ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun showSettings() {
-        Toast.makeText(this, "Settings will be implemented soon", Toast.LENGTH_SHORT).show()
+        val options = ScanOptions()
+        options.setPrompt("Scan Photo Sync QR Code on your PC")
+        options.setBeepEnabled(true)
+        options.setOrientationLocked(false)
+        barcodeLauncher.launch(options)
     }
 
     private fun requestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED), 101)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissions(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES), 101)
         } else {
             requestPermissions(arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), 101)
@@ -328,9 +361,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 101 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Permissions granted!", Toast.LENGTH_SHORT).show()
-            loadGalleryPhotos()
+        if (requestCode == 101) {
+            checkPartialAccess()
+            if (hasStoragePermission()) {
+                loadGalleryPhotos()
+            }
         }
     }
 }

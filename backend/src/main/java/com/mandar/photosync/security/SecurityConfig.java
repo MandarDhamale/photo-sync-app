@@ -16,7 +16,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(authz -> authz
-                        .requestMatchers("/api/**").permitAll() // No auth required for API
+                        .requestMatchers("/api/**", "/", "/index.html", "/js/**", "/logo.jpg").permitAll() 
                         .anyRequest().authenticated()
                 )
                 .csrf(csrf -> csrf

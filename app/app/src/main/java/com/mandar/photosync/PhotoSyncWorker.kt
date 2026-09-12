@@ -11,10 +11,15 @@ import okhttp3.MultipartBody
 class PhotoSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     // Add the API service instance
-    private val apiService = RetrofitInstance.api
+    private val apiService get() = RetrofitInstance.getApi(applicationContext)
 
     override suspend fun doWork(): Result {
         return try {
+            val prefs = applicationContext.getSharedPreferences("photosync", Context.MODE_PRIVATE)
+            if (!prefs.contains("server_ip")) {
+                Log.w("PhotoSyncWorker", "Skipping sync: Not paired with server")
+                return Result.success()
+            }
             checkAndUploadNewPhotos()
             Result.success()
         } catch (e: Exception) {
@@ -87,7 +92,7 @@ class PhotoSyncWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 )
 
                 // Use the apiService instance instead of RetrofitInstance.api directly
-                val response = apiService.uploadPhoto("", filePart)
+                val response = apiService.uploadPhoto(filePart)
                 if (response.isSuccessful) {
                     Log.d("PhotoSyncWorker", "Uploaded: $fileName")
                     // You could update UI here via LiveData or Broadcast if needed

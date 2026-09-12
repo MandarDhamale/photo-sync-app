@@ -116,6 +116,9 @@ class PhotoSyncService : Service() {
 
     private suspend fun uploadPhoto(filePath: String, fileName: String) {
         try {
+            val prefs = applicationContext.getSharedPreferences("photosync", android.content.Context.MODE_PRIVATE)
+            if (!prefs.contains("server_ip")) return
+
             val file = java.io.File(filePath)
             if (file.exists()) {
                 val requestBody = file.asRequestBody("image/*".toMediaType())
@@ -125,7 +128,7 @@ class PhotoSyncService : Service() {
                     requestBody
                 )
 
-                val response = RetrofitInstance.api.uploadPhoto("", filePart)
+                val response = RetrofitInstance.getApi(applicationContext).uploadPhoto(filePart)
                 if (response.isSuccessful) {
                     Log.d("PhotoSync", "Uploaded: $fileName")
                 } else {

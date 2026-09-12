@@ -75,6 +75,7 @@ dependencies {
 
     implementation("androidx.constraintlayout:constraintlayout:2.2.0-alpha13")
     implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("com.google.android.material:material:1.11.0")
     implementation("com.squareup.retrofit2:converter-scalars:2.9.0")
     implementation("androidx.work:work-runtime-ktx:2.8.1")
     implementation("androidx.cardview:cardview:1.0.0")
@@ -84,5 +85,6 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.14.2")
     annotationProcessor("com.github.bumptech.glide:compiler:4.14.2")
 
-
-0}
+    // ZXing for QR scanning
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+}

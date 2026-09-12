@@ -1,0 +1,22 @@
+# Android build folders
+app/build/
+app/app/build/
+.gradle/
+.idea/
+local.properties
+
+# Spring Boot backend build folders
+backend/target/
+backend/PhotoSyncServer/
+desktop app/
+
+# SQLite databases
+backend/photosync.db
+backend/photosync.db-journal
+backend/pairing_token.txt
+
+# Uploads directory
+backend/uploads/
+
+# Binaries and APKs
+*.apk
