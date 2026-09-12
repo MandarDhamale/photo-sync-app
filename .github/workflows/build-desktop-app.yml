@@ -1,0 +1,81 @@
+name: Build Desktop Apps
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+        working-directory: backend
+
+      - name: Package with jpackage
+        run: |
+          jpackage \
+            --type app-image \
+            --name PhotoSyncServer \
+            --input target \
+            --main-jar photosync-0.0.1-SNAPSHOT.jar \
+            --dest .
+        working-directory: backend
+
+      - name: Zip the output
+        run: zip -r PhotoSyncServer-Linux.zip PhotoSyncServer
+        working-directory: backend
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoSyncServer-Linux
+          path: backend/PhotoSyncServer-Linux.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+        working-directory: backend
+
+      - name: Package with jpackage
+        run: |
+          jpackage `
+            --type app-image `
+            --name PhotoSyncServer `
+            --input target `
+            --main-jar photosync-0.0.1-SNAPSHOT.jar `
+            --dest .
+        working-directory: backend
+        
+      - name: Zip the output
+        run: Compress-Archive -Path PhotoSyncServer -DestinationPath PhotoSyncServer-Windows.zip
+        working-directory: backend
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoSyncServer-Windows
+          path: backend/PhotoSyncServer-Windows.zip
