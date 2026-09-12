@@ -33,15 +33,11 @@ jobs:
             --dest .
         working-directory: backend
 
-      - name: Zip the output
-        run: zip -r PhotoSyncServer-Linux.zip PhotoSyncServer
-        working-directory: backend
-
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PhotoSyncServer-Linux
-          path: backend/PhotoSyncServer-Linux.zip
+          path: backend/PhotoSyncServer
 
   build-windows:
     runs-on: windows-latest
@@ -70,12 +66,8 @@ jobs:
             --dest .
         working-directory: backend
         
-      - name: Zip the output
-        run: Compress-Archive -Path PhotoSyncServer -DestinationPath PhotoSyncServer-Windows.zip
-        working-directory: backend
-
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: PhotoSyncServer-Windows
-          path: backend/PhotoSyncServer-Windows.zip
+          path: backend/PhotoSyncServer
