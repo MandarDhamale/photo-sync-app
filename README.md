@@ -6,7 +6,7 @@ PhotoSync is a privacy-first application that securely backs up photos from your
 **Easy Pairing:** Uses a secure QR code to pair your phone and your computer instantly.
 **Standalone Backend:** The server comes bundled with a Java runtime and an embedded SQLite database. No setup required!
 
-## How to Use (For Non-Technical Users)
+## How to Use 
 
 ### Prerequisites
 Make sure your Android phone and your computer are connected to the **same Wi-Fi network**.
